@@ -1,0 +1,12 @@
+pyrogram
+tgcrypto
+motor
+python-dotenv
+pydantic-settings
+pydantic
+apscheduler
+telegraph
+aiohttp
+python-magic
+Pillow
+pytz
