@@ -33,7 +33,7 @@ class ButtonBuilder:
         return types.InlineKeyboardMarkup(buttons)
 
     @staticmethod
-    def post_confirmation(has_text=False, has_media=False, has_buttons=False, has_schedule=False):
+    def post_confirmation(has_text=False, has_media=False, has_buttons=False, has_schedule=False, selected_count=0):
         return types.InlineKeyboardMarkup([
             [
                 types.InlineKeyboardButton(f"{'✅' if has_text else '📝'} Set Text", callback_data="set_post_text"),
@@ -44,17 +44,34 @@ class ButtonBuilder:
                 types.InlineKeyboardButton(f"{'✅' if has_schedule else '📅'} Schedule", callback_data="schedule_post")
             ],
             [
-                types.InlineKeyboardButton("📄 Telegraph", callback_data="create_telegraph"),
+                types.InlineKeyboardButton(f"📢 Channels ({selected_count})", callback_data="select_broadcast_channels"),
                 types.InlineKeyboardButton("👀 Preview", callback_data="preview_post")
             ],
             [
-                types.InlineKeyboardButton("🚀 Broadcast", callback_data="publish_now"),
+                types.InlineKeyboardButton("📄 Telegraph", callback_data="create_telegraph"),
                 types.InlineKeyboardButton("🗑 Discard", callback_data="discard_post")
+            ],
+            [
+                types.InlineKeyboardButton("🚀 Broadcast Now", callback_data="publish_now")
             ],
             [
                 types.InlineKeyboardButton("🔙 Back", callback_data="main_menu")
             ]
         ])
+
+    @staticmethod
+    def channel_selection_menu(channels, selected_ids):
+        buttons = []
+        for ch in channels:
+            is_selected = ch["channel_id"] in selected_ids
+            status = "✅" if is_selected else "❌"
+            buttons.append([types.InlineKeyboardButton(
+                f"{status} {ch['title']}", 
+                callback_data=f"toggle_ch_{ch['channel_id']}"
+            )])
+        
+        buttons.append([types.InlineKeyboardButton("✅ Done", callback_data="preview_broadcast")])
+        return types.InlineKeyboardMarkup(buttons)
 
     @staticmethod
     def settings_menu(user_settings):

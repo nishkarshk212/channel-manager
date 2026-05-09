@@ -16,7 +16,8 @@ def get_post_kb(user_id):
         has_text=bool(state.get("caption")),
         has_media=bool(state.get("file_id")),
         has_buttons=bool(state.get("buttons")),
-        has_schedule=bool(state.get("schedule_time"))
+        has_schedule=bool(state.get("schedule_time")),
+        selected_count=len(state.get("selected_channels", []))
     )
 
 @Client.on_message(filters.command("broadcast") & filters.private)
@@ -27,7 +28,8 @@ async def broadcast_command_handler(client: Client, message: types.Message):
         "file_id": None,
         "caption": None,
         "buttons": [],
-        "schedule_time": None
+        "schedule_time": None,
+        "selected_channels": []
     }
     await message.reply_text(
         "📝 **Broadcast Panel**\n\nUse the buttons below to build your post.",
@@ -42,7 +44,8 @@ async def start_post_creation(client: Client, query: types.CallbackQuery):
         "file_id": None,
         "caption": None,
         "buttons": [],
-        "schedule_time": None
+        "schedule_time": None,
+        "selected_channels": []
     }
     await query.message.edit_text(
         "📝 **Broadcast Panel**\n\nUse the buttons below to build your post.",
@@ -207,6 +210,45 @@ async def create_telegraph_handler(client: Client, query: types.CallbackQuery):
     else:
         await query.message.reply_text("❌ Failed to create Telegraph page.")
 
+@Client.on_callback_query(filters.regex("^select_broadcast_channels$"))
+async def select_broadcast_channels_handler(client: Client, query: types.CallbackQuery):
+    user_id = query.from_user.id
+    state = user_states.get(user_id)
+    if not state: return
+
+    channels = await crud.get_channels(user_id)
+    if not channels:
+        return await query.answer("❌ No channels connected.", show_alert=True)
+
+    await query.message.edit_text(
+        "📢 **Select Channels for Broadcast**\n\nChoose the channels you want to post to:",
+        reply_markup=ButtonBuilder.channel_selection_menu(channels, state["selected_channels"])
+    )
+
+@Client.on_callback_query(filters.regex("^toggle_ch_"))
+async def toggle_channel_handler(client: Client, query: types.CallbackQuery):
+    user_id = query.from_user.id
+    state = user_states.get(user_id)
+    if not state: return
+
+    channel_id = int(query.data.replace("toggle_ch_", ""))
+    if channel_id in state["selected_channels"]:
+        state["selected_channels"].remove(channel_id)
+    else:
+        state["selected_channels"].append(channel_id)
+
+    channels = await crud.get_channels(user_id)
+    await query.message.edit_reply_markup(
+        reply_markup=ButtonBuilder.channel_selection_menu(channels, state["selected_channels"])
+    )
+
+@Client.on_callback_query(filters.regex("^preview_broadcast$"))
+async def preview_broadcast_handler(client: Client, query: types.CallbackQuery):
+    await query.message.edit_text(
+        "📝 **Broadcast Panel**\n\nUse the buttons below to build your post.",
+        reply_markup=get_post_kb(query.from_user.id)
+    )
+
 @Client.on_callback_query(filters.regex("^preview_post$"))
 async def preview_post(client: Client, query: types.CallbackQuery):
     user_id = query.from_user.id
@@ -237,15 +279,14 @@ async def publish_now(client: Client, query: types.CallbackQuery):
     if not state or (not state["caption"] and not state["file_id"]):
         return await query.answer("Post is empty!", show_alert=True)
 
-    channels = await crud.get_channels(user_id)
-    if not channels:
-        return await query.answer("❌ No channels connected.", show_alert=True)
+    if not state.get("selected_channels"):
+        return await query.answer("❌ Please select at least one channel first.", show_alert=True)
 
     # If schedule time is set, save to DB and return
     if state.get("schedule_time"):
         post_data = Post(
             user_id=user_id,
-            channel_ids=[ch["channel_id"] for ch in channels],
+            channel_ids=state["selected_channels"],
             content_type=state["content_type"],
             media_file_id=state["file_id"],
             caption=state["caption"],
@@ -257,7 +298,7 @@ async def publish_now(client: Client, query: types.CallbackQuery):
         await crud.create_post(post_data)
         await query.message.edit_text(
             f"📅 **Post Scheduled!**\n\n"
-            f"Your post will be published to {len(channels)} channels on "
+            f"Your post will be published to {len(state['selected_channels'])} channels on "
             f"`{state['schedule_time'].strftime('%Y-%m-%d %H:%M')}` UTC."
         )
         del user_states[user_id]
@@ -265,7 +306,7 @@ async def publish_now(client: Client, query: types.CallbackQuery):
 
     # Normal broadcast
     success_count = 0
-    await query.message.edit_text("🚀 **Broadcasting...**")
+    await query.message.edit_text(f"🚀 **Broadcasting to {len(state['selected_channels'])} channels...**")
 
     reply_markup = None
     if state["buttons"]:
@@ -274,16 +315,30 @@ async def publish_now(client: Client, query: types.CallbackQuery):
             kb.append([types.InlineKeyboardButton(btn["text"], url=btn["url"])])
         reply_markup = types.InlineKeyboardMarkup(kb)
 
-    for ch in channels:
+    for ch_id in state["selected_channels"]:
         try:
             await post_service.send_to_channel(
-                client, ch["channel_id"], state["content_type"], state["file_id"], state["caption"], reply_markup, state.get("entities")
+                client, ch_id, state["content_type"], state["file_id"], state["caption"], reply_markup, state.get("entities")
             )
             success_count += 1
         except Exception as e:
-            await client.send_message(user_id, f"❌ Failed in {ch['title']}: {e}")
+            await client.send_message(user_id, f"❌ Failed to post in channel {ch_id}: {e}")
 
-    await query.message.edit_text(f"✅ **Broadcast Complete!**\nPosted to {success_count} channels.")
+    # Save to history even for immediate broadcast
+    post_data = Post(
+        user_id=user_id,
+        channel_ids=state["selected_channels"],
+        content_type=state["content_type"],
+        media_file_id=state["file_id"],
+        caption=state["caption"],
+        entities=state.get("entities"),
+        buttons=state["buttons"],
+        status="published",
+        created_at=datetime.utcnow()
+    )
+    await crud.create_post(post_data)
+
+    await query.message.edit_text(f"✅ **Broadcast Complete!**\nPosted to {success_count} channels.\nPost saved to history.")
     del user_states[user_id]
 
 @Client.on_callback_query(filters.regex("^discard_post$"))
