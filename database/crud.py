@@ -57,6 +57,15 @@ class CRUD:
         else:
             await local_db.delete_one("channels", {"channel_id": channel_id, "owner_id": user_id})
 
+    async def get_channel_by_id(self, channel_id: int) -> Optional[Dict]:
+        if self.use_mongo:
+            return await db.db.channels.find_one({"channel_id": channel_id})
+        all_channels = await local_db.find("channels")
+        for ch in all_channels:
+            if int(ch.get("channel_id")) == int(channel_id):
+                return ch
+        return None
+
     # Post Operations
     async def create_post(self, post_data: Post):
         if self.use_mongo:

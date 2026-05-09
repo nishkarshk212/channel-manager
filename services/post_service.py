@@ -19,7 +19,17 @@ class PostService:
             try:
                 await client.get_chat(channel_id)
             except Exception as e:
-                logger.warning(f"Could not pre-resolve chat {channel_id}: {e}")
+                logger.warning(f"Could not pre-resolve chat {channel_id} by ID: {e}")
+                # Try resolving via username from DB if ID fails
+                channel_data = await crud.get_channel_by_id(channel_id)
+                if channel_data and channel_data.get("username"):
+                    username = channel_data["username"]
+                    logger.info(f"Attempting to resolve chat via username: @{username}")
+                    try:
+                        chat = await client.get_chat(username)
+                        channel_id = chat.id  # Update ID to the resolved one
+                    except Exception as e2:
+                        logger.error(f"Failed to resolve chat via username @{username}: {e2}")
 
             # Convert dict entities back to MessageEntity if necessary
             if entities and isinstance(entities, list) and isinstance(entities[0], dict):
