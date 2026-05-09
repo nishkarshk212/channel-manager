@@ -50,7 +50,11 @@ class PostService:
                     entity_type = e.get("type")
                     if isinstance(entity_type, str):
                         try:
-                            entity_type = getattr(MessageEntityType, entity_type.upper())
+                            # Premium emojis are often identified as 'custom_emoji'
+                            if entity_type == "custom_emoji":
+                                entity_type = MessageEntityType.CUSTOM_EMOJI
+                            else:
+                                entity_type = getattr(MessageEntityType, entity_type.upper())
                         except AttributeError:
                             pass
                     
@@ -59,13 +63,16 @@ class PostService:
                     if emoji_id:
                         try:
                             emoji_id = int(emoji_id)
+                            # If it's a custom emoji, force the type if it was missed
+                            if not entity_type or entity_type == "custom_emoji":
+                                entity_type = MessageEntityType.CUSTOM_EMOJI
                         except ValueError:
                             pass
                     
                     reconstructed_entities.append(MessageEntity(
                         type=entity_type,
-                        offset=e.get("offset"),
-                        length=e.get("length"),
+                        offset=int(e.get("offset", 0)),
+                        length=int(e.get("length", 0)),
                         url=e.get("url"),
                         custom_emoji_id=emoji_id,
                         language=e.get("language")

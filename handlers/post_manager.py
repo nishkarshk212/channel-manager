@@ -102,7 +102,9 @@ async def handle_messages(client: Client, message: types.Message):
                     "length": e.length,
                 }
                 if e.url: e_dict["url"] = e.url
-                if e.custom_emoji_id: e_dict["custom_emoji_id"] = str(e.custom_emoji_id)
+                if e.custom_emoji_id: 
+                    e_dict["custom_emoji_id"] = int(e.custom_emoji_id)
+                    e_dict["type"] = "custom_emoji"  # Force correct type for premium emojis
                 if e.language: e_dict["language"] = e.language
                 state["entities"].append(e_dict)
         else:
