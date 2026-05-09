@@ -15,13 +15,21 @@ class PostService:
         entities: Optional[List[types.MessageEntity]] = None
     ):
         try:
+            # Ensure channel_id is an integer if it looks like one
+            if isinstance(channel_id, str):
+                try:
+                    if channel_id.startswith("-100") or channel_id.startswith("-"):
+                        channel_id = int(channel_id)
+                except ValueError:
+                    pass
+
             # Try to resolve peer if it's a numeric ID and might not be in cache
             try:
                 await client.get_chat(channel_id)
             except Exception as e:
                 logger.warning(f"Could not pre-resolve chat {channel_id} by ID: {e}")
                 # Try resolving via username from DB if ID fails
-                channel_data = await crud.get_channel_by_id(channel_id)
+                channel_data = await crud.get_channel_by_id(channel_id) if isinstance(channel_id, int) else None
                 if channel_data and channel_data.get("username"):
                     username = channel_data["username"]
                     logger.info(f"Attempting to resolve chat via username: @{username}")
@@ -46,12 +54,20 @@ class PostService:
                         except AttributeError:
                             pass
                     
+                    # Ensure custom_emoji_id is an integer (fixes 'to_bytes' error)
+                    emoji_id = e.get("custom_emoji_id")
+                    if emoji_id:
+                        try:
+                            emoji_id = int(emoji_id)
+                        except ValueError:
+                            pass
+                    
                     reconstructed_entities.append(MessageEntity(
                         type=entity_type,
                         offset=e.get("offset"),
                         length=e.get("length"),
                         url=e.get("url"),
-                        custom_emoji_id=e.get("custom_emoji_id"),
+                        custom_emoji_id=emoji_id,
                         language=e.get("language")
                     ))
                 entities = reconstructed_entities
