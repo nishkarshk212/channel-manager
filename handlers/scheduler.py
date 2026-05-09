@@ -28,7 +28,8 @@ class Scheduler:
                         post["content_type"],
                         post.get("media_file_id"),
                         post.get("caption"),
-                        reply_markup=reply_markup
+                        reply_markup=reply_markup,
+                        entities=post.get("entities")
                     )
                 await crud.update_post_status(str(post["_id"]), "published")
                 logger.info(f"Scheduled post {post['_id']} published")

@@ -30,6 +30,7 @@ class Post(BaseModel):
     content_type: str  # text, photo, video, etc.
     media_file_id: Optional[str] = None
     caption: Optional[str] = None
+    entities: Optional[List[Dict[str, Any]]] = None
     buttons: List[Dict[str, str]] = []
     scheduled_at: Optional[datetime] = None
     status: str = "draft"  # draft, scheduled, published

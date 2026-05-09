@@ -89,7 +89,11 @@ async def handle_messages(client: Client, message: types.Message):
     
     if state["step"] == "waiting_for_text":
         state["caption"] = message.text or message.caption
-        state["entities"] = message.entities or message.caption_entities
+        entities = message.entities or message.caption_entities
+        if entities:
+            state["entities"] = [e.__dict__ for e in entities] if hasattr(entities[0], "__dict__") else entities
+        else:
+            state["entities"] = None
         state["step"] = "idle"
         await message.reply_text("✅ **Text saved with formatting!**", reply_markup=get_post_kb(user_id))
 
@@ -112,6 +116,9 @@ async def handle_messages(client: Client, message: types.Message):
         elif message.voice:
             state["content_type"] = "voice"
             state["file_id"] = message.voice.file_id
+        elif message.sticker:
+            state["content_type"] = "sticker"
+            state["file_id"] = message.sticker.file_id
         
         state["step"] = "idle"
         await message.reply_text(f"✅ **Media saved!** ({state['content_type']})", reply_markup=get_post_kb(user_id))
@@ -242,6 +249,7 @@ async def publish_now(client: Client, query: types.CallbackQuery):
             content_type=state["content_type"],
             media_file_id=state["file_id"],
             caption=state["caption"],
+            entities=state.get("entities"),
             buttons=state["buttons"],
             scheduled_at=state["schedule_time"],
             status="scheduled"
