@@ -6,6 +6,7 @@ from services.post_service import post_service
 import asyncio
 from datetime import datetime
 import pytz
+import re
 
 # Simple in-memory state for post creation
 user_states = {}
@@ -156,13 +157,36 @@ async def handle_messages(client: Client, message: types.Message):
             return await message.reply_text("✅ **Buttons saved!**", reply_markup=get_post_kb(user_id))
         
         try:
+            added_count = 0
             for line in message.text.split("\n"):
                 if "|" not in line: continue
                 text, url = line.split("|", 1)
-                state["buttons"].append({"text": text.strip(), "url": url.strip()})
-            await message.reply_text(f"✅ Added {len(state['buttons'])} buttons. Send more or /done.")
-        except Exception:
-            await message.reply_text("❌ Invalid format. Use: `Text | URL`")
+                text = text.strip()
+                url = url.strip()
+                
+                # Basic URL cleanup and validation
+                if not url.startswith(("http://", "https://")):
+                    url = f"https://{url}"
+                
+                # Validate URL format
+                url_pattern = re.compile(
+                    r'^https?://'  # http:// or https://
+                    r'(?:(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)+[A-Z]{2,6}\.?|'  # domain...
+                    r'localhost|'  # localhost...
+                    r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})'  # ...or ip
+                    r'(?::\d+)?'  # optional port
+                    r'(?:/?|[/?]\S+)$', re.IGNORECASE)
+                
+                if re.match(url_pattern, url):
+                    state["buttons"].append({"text": text, "url": url})
+                    added_count += 1
+                else:
+                    await message.reply_text(f"⚠️ **Invalid URL skipped:** `{url}`")
+
+            if added_count > 0:
+                await message.reply_text(f"✅ Added {added_count} buttons. Total: {len(state['buttons'])}. Send more or /done.")
+        except Exception as e:
+            await message.reply_text(f"❌ **Error parsing buttons:** {e}")
 
     elif state["step"] == "waiting_for_telegraph_title":
         state["telegraph_title"] = message.text
