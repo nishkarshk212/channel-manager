@@ -118,6 +118,38 @@ async def extra_tools_handler(client: Client, query: types.CallbackQuery):
             reply_markup=ButtonBuilder.extra_tools_menu()
         )
 
+@Client.on_callback_query(filters.regex("^tool_refresh_session$"))
+async def refresh_session_handler(client: Client, query: types.CallbackQuery):
+    await query.answer("🔄 Refreshing peer cache...")
+    channels = await crud.get_channels(query.from_user.id)
+    if not channels:
+        return await query.message.edit_text("❌ No channels connected to refresh.", reply_markup=ButtonBuilder.extra_tools_menu())
+
+    success = 0
+    failed = 0
+    for ch in channels:
+        try:
+            await client.get_chat(ch["channel_id"])
+            success += 1
+        except Exception:
+            # Try via username if available
+            if ch.get("username"):
+                try:
+                    await client.get_chat(ch["username"])
+                    success += 1
+                    continue
+                except Exception:
+                    pass
+            failed += 1
+
+    await query.message.edit_text(
+        f"✅ **Session Refresh Complete!**\n\n"
+        f"Successfully re-cached: {success} channels\n"
+        f"Failed to resolve: {failed} channels\n\n"
+        f"If a channel failed, try removing and adding it again.",
+        reply_markup=ButtonBuilder.extra_tools_menu()
+    )
+
 @Client.on_callback_query(filters.regex("^view_scheduled$"))
 async def view_scheduled_handler(client: Client, query: types.CallbackQuery):
     all_posts = await crud.get_scheduled_posts()

@@ -97,6 +97,9 @@ class ButtonBuilder:
             ],
             [
                 types.InlineKeyboardButton("🏷 Hashtags", callback_data="tool_hashtags"),
+                types.InlineKeyboardButton("🔄 Refresh Session", callback_data="tool_refresh_session")
+            ],
+            [
                 types.InlineKeyboardButton("🤖 AI Suggestion", callback_data="tool_ai_caption")
             ],
             [
