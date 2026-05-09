@@ -15,6 +15,12 @@ class PostService:
         entities: Optional[List[types.MessageEntity]] = None
     ):
         try:
+            # Try to resolve peer if it's a numeric ID and might not be in cache
+            try:
+                await client.get_chat(channel_id)
+            except Exception as e:
+                logger.warning(f"Could not pre-resolve chat {channel_id}: {e}")
+
             # Convert dict entities back to MessageEntity if necessary
             if entities and isinstance(entities, list) and isinstance(entities[0], dict):
                 from pyrogram.types import MessageEntity
