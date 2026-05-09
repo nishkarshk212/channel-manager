@@ -94,7 +94,17 @@ async def handle_messages(client: Client, message: types.Message):
         state["caption"] = message.text or message.caption
         entities = message.entities or message.caption_entities
         if entities:
-            state["entities"] = [e.__dict__ for e in entities] if hasattr(entities[0], "__dict__") else entities
+            state["entities"] = []
+            for e in entities:
+                e_dict = {
+                    "type": e.type.name.lower() if hasattr(e.type, "name") else str(e.type).split(".")[-1].lower(),
+                    "offset": e.offset,
+                    "length": e.length,
+                }
+                if e.url: e_dict["url"] = e.url
+                if e.custom_emoji_id: e_dict["custom_emoji_id"] = str(e.custom_emoji_id)
+                if e.language: e_dict["language"] = e.language
+                state["entities"].append(e_dict)
         else:
             state["entities"] = None
         state["step"] = "idle"

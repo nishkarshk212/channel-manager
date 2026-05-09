@@ -18,9 +18,27 @@ class PostService:
             # Convert dict entities back to MessageEntity if necessary
             if entities and isinstance(entities, list) and isinstance(entities[0], dict):
                 from pyrogram.types import MessageEntity
-                # Filter out keys that are not in MessageEntity constructor
-                valid_keys = {"type", "offset", "length", "url", "user", "language", "custom_emoji_id"}
-                entities = [MessageEntity(**{k: v for k, v in e.items() if k in valid_keys}) for e in entities]
+                from pyrogram.enums import MessageEntityType
+                
+                reconstructed_entities = []
+                for e in entities:
+                    # Map string type back to Enum if possible
+                    entity_type = e.get("type")
+                    if isinstance(entity_type, str):
+                        try:
+                            entity_type = getattr(MessageEntityType, entity_type.upper())
+                        except AttributeError:
+                            pass
+                    
+                    reconstructed_entities.append(MessageEntity(
+                        type=entity_type,
+                        offset=e.get("offset"),
+                        length=e.get("length"),
+                        url=e.get("url"),
+                        custom_emoji_id=e.get("custom_emoji_id"),
+                        language=e.get("language")
+                    ))
+                entities = reconstructed_entities
 
             if content_type == "text":
                 return await client.send_message(channel_id, caption, reply_markup=reply_markup, entities=entities)
