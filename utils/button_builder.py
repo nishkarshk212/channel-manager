@@ -75,11 +75,14 @@ class ButtonBuilder:
     def extra_tools_menu():
         return types.InlineKeyboardMarkup([
             [
-                types.InlineKeyboardButton("✂️ Shortlink", callback_data="tool_shortlink"),
-                types.InlineKeyboardButton("🏷 Hashtags", callback_data="tool_hashtags")
+                types.InlineKeyboardButton("📄 Custom Telegraph", callback_data="tool_custom_telegraph"),
+                types.InlineKeyboardButton("✂️ Shortlink", callback_data="tool_shortlink")
             ],
             [
-                types.InlineKeyboardButton("🤖 AI Suggestion", callback_data="tool_ai_caption"),
+                types.InlineKeyboardButton("🏷 Hashtags", callback_data="tool_hashtags"),
+                types.InlineKeyboardButton("🤖 AI Suggestion", callback_data="tool_ai_caption")
+            ],
+            [
                 types.InlineKeyboardButton("🔙 Back", callback_data="main_menu")
             ]
         ])

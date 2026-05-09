@@ -142,7 +142,38 @@ async def handle_messages(client: Client, message: types.Message):
         except Exception:
             await message.reply_text("❌ Invalid format. Use: `Text | URL`")
 
+    elif state["step"] == "waiting_for_telegraph_title":
+        state["telegraph_title"] = message.text
+        state["step"] = "waiting_for_telegraph_content"
+        await message.reply_text("📝 **Now send the content (HTML/Text) for your Telegraph page.**")
+
+    elif state["step"] == "waiting_for_telegraph_content":
+        title = state.get("telegraph_title", "Custom Page")
+        content = message.text.replace("\n", "<br>")
+        if not content.startswith("<p>"):
+            content = f"<p>{content}</p>"
+        
+        await message.reply_text("📄 **Creating Telegraph page...**")
+        link = await telegraph_service.create_page(title=title, html_content=content)
+        
+        if link:
+            await message.reply_text(f"✅ **Telegraph page created!**\n\nLink: {link}")
+        else:
+            await message.reply_text("❌ Failed to create Telegraph page.")
+        
+        state["step"] = "idle"
+        # If they were in the middle of a broadcast, show the KB, otherwise just reset
+        if state.get("caption") or state.get("file_id"):
+            await message.reply_text("Back to post creation:", reply_markup=get_post_kb(user_id))
+        else:
+            del user_states[user_id]
+
 from services.telegraph_service import telegraph_service
+
+@Client.on_callback_query(filters.regex("^tool_custom_telegraph$"))
+async def custom_telegraph_start(client: Client, query: types.CallbackQuery):
+    user_states[query.from_user.id] = {"step": "waiting_for_telegraph_title"}
+    await query.message.edit_text("📄 **Custom Telegraph Creator**\n\nPlease send the **Title** for your page.")
 
 @Client.on_callback_query(filters.regex("^create_telegraph$"))
 async def create_telegraph_handler(client: Client, query: types.CallbackQuery):
