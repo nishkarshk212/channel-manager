@@ -1,5 +1,5 @@
 from typing import List
-from pyrogram import Client
+from hydrogram import Client
 from database.crud import crud
 from services.post_service import post_service
 from utils.logger import logger

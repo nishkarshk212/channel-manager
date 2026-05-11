@@ -1,4 +1,4 @@
-from pyrogram import Client, filters, types
+from hydrogram import Client, filters, types
 from utils.button_builder import ButtonBuilder
 
 COMMAND_HELP = {

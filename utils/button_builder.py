@@ -1,4 +1,4 @@
-from pyrogram import types
+from hydrogram import types
 
 class ButtonBuilder:
     @staticmethod

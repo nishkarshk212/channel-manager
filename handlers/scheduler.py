@@ -2,7 +2,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from database.crud import crud
 from services.post_service import post_service
 from utils.logger import logger
-from pyrogram import Client, types
+from hydrogram import Client, types
 from datetime import datetime
 
 class Scheduler:

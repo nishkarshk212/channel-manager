@@ -1,11 +1,11 @@
-from pyrogram import Client, filters
-from pyrogram.types import (
+from hydrogram import Client, filters
+from hydrogram.types import (
     CallbackQuery,
     Message,
     InlineKeyboardMarkup,
     InlineKeyboardButton
 )
-from pyrogram.enums import ChatType, ChatMemberStatus
+from hydrogram.enums import ChatType, ChatMemberStatus
 
 from utils.button_builder import ButtonBuilder
 from database.crud import crud

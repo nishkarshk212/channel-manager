@@ -1,5 +1,5 @@
-from pyrogram import Client, filters
-from pyrogram.handlers import MessageHandler
+from hydrogram import Client, filters
+from hydrogram.handlers import MessageHandler
 from config import settings
 from database.connection import db
 from database.crud import crud

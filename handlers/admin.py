@@ -1,5 +1,5 @@
-from pyrogram import Client, filters
-from pyrogram.types import CallbackQuery, Message
+from hydrogram import Client, filters
+from hydrogram.types import CallbackQuery, Message
 from database.crud import crud
 from services.analytics import analytics_service
 

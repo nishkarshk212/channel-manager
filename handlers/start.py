@@ -1,5 +1,5 @@
-from pyrogram import Client, filters, types
-from pyrogram.types import Message
+from hydrogram import Client, filters, types
+from hydrogram.types import Message
 from utils.button_builder import ButtonBuilder
 from utils.logger import logger
 from database.models import User

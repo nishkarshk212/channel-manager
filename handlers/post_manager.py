@@ -1,4 +1,4 @@
-from pyrogram import Client, filters, types
+from hydrogram import Client, filters, types
 from database.crud import crud
 from database.models import Post
 from utils.button_builder import ButtonBuilder
@@ -97,15 +97,21 @@ async def handle_messages(client: Client, message: types.Message):
         if entities:
             state["entities"] = []
             for e in entities:
+                # Handle different types of entity representations
+                try:
+                    entity_type = e.type.name.lower() if hasattr(e.type, "name") else str(e.type).split(".")[-1].lower()
+                except Exception:
+                    entity_type = str(e.type)
+                
                 e_dict = {
-                    "type": e.type.name.lower() if hasattr(e.type, "name") else str(e.type).split(".")[-1].lower(),
+                    "type": entity_type,
                     "offset": e.offset,
                     "length": e.length,
                 }
                 if e.url: e_dict["url"] = e.url
                 if e.custom_emoji_id: 
-                    e_dict["custom_emoji_id"] = int(e.custom_emoji_id)
-                    e_dict["type"] = "custom_emoji"  # Force correct type for premium emojis
+                    e_dict["custom_emoji_id"] = str(e.custom_emoji_id) # Store as string for better compatibility
+                    e_dict["type"] = "custom_emoji"
                 if e.language: e_dict["language"] = e.language
                 state["entities"].append(e_dict)
         else:
@@ -114,6 +120,32 @@ async def handle_messages(client: Client, message: types.Message):
         await message.reply_text("✅ **Text saved with formatting!**", reply_markup=get_post_kb(user_id))
 
     elif state["step"] == "waiting_for_media":
+        # Capture caption and entities from media message if present
+        if message.caption:
+            state["caption"] = message.caption
+            entities = message.caption_entities
+            if entities:
+                state["entities"] = []
+                for e in entities:
+                    try:
+                        entity_type = e.type.name.lower() if hasattr(e.type, "name") else str(e.type).split(".")[-1].lower()
+                    except Exception:
+                        entity_type = str(e.type)
+                    
+                    e_dict = {
+                        "type": entity_type,
+                        "offset": e.offset,
+                        "length": e.length,
+                    }
+                    if e.url: e_dict["url"] = e.url
+                    if e.custom_emoji_id: 
+                        e_dict["custom_emoji_id"] = str(e.custom_emoji_id)
+                        e_dict["type"] = "custom_emoji"
+                    if e.language: e_dict["language"] = e.language
+                    state["entities"].append(e_dict)
+            else:
+                state["entities"] = None
+
         if message.photo:
             state["content_type"] = "photo"
             state["file_id"] = message.photo.file_id
@@ -137,7 +169,10 @@ async def handle_messages(client: Client, message: types.Message):
             state["file_id"] = message.sticker.file_id
         
         state["step"] = "idle"
-        await message.reply_text(f"✅ **Media saved!** ({state['content_type']})", reply_markup=get_post_kb(user_id))
+        msg = f"✅ **Media saved!** ({state['content_type']})"
+        if state.get("caption"):
+            msg += "\n(Caption and formatting preserved)"
+        await message.reply_text(msg, reply_markup=get_post_kb(user_id))
     
     elif state["step"] == "waiting_for_schedule":
         try:

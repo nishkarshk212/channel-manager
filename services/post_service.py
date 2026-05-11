@@ -1,4 +1,4 @@
-from pyrogram import Client, types
+from hydrogram import Client, types
 from typing import List, Optional
 from database.crud import crud
 from utils.logger import logger
@@ -47,8 +47,8 @@ class PostService:
 
             # Convert dict entities back to MessageEntity if necessary
             if entities and isinstance(entities, list) and isinstance(entities[0], dict):
-                from pyrogram.types import MessageEntity
-                from pyrogram.enums import MessageEntityType
+                from hydrogram.types import MessageEntity
+                from hydrogram.enums import MessageEntityType
                 
                 reconstructed_entities = []
                 for e in entities:
@@ -56,13 +56,27 @@ class PostService:
                     entity_type = e.get("type")
                     if isinstance(entity_type, str):
                         try:
-                            # Premium emojis are often identified as 'custom_emoji'
+                            # Handle custom_emoji specifically
                             if entity_type == "custom_emoji":
                                 entity_type = MessageEntityType.CUSTOM_EMOJI
+                            # Handle blockquote and other potential newer types
+                            elif entity_type == "blockquote":
+                                # Try to get BLOCKQUOTE from MessageEntityType if it exists
+                                try:
+                                    entity_type = MessageEntityType.BLOCKQUOTE
+                                except AttributeError:
+                                    # Fallback for older hydrogram versions
+                                    logger.warning("BLOCKQUOTE entity type not supported by this Pyrogram version")
+                                    continue # Skip if not supported
                             else:
-                                entity_type = getattr(MessageEntityType, entity_type.upper())
-                        except AttributeError:
-                            pass
+                                try:
+                                    entity_type = getattr(MessageEntityType, entity_type.upper())
+                                except AttributeError:
+                                    logger.warning(f"Entity type {entity_type} not supported by this Pyrogram version")
+                                    continue
+                        except Exception as exc:
+                            logger.error(f"Error mapping entity type {entity_type}: {exc}")
+                            continue
                     
                     # Ensure custom_emoji_id is an integer (fixes 'to_bytes' error)
                     emoji_id = e.get("custom_emoji_id")
@@ -70,19 +84,26 @@ class PostService:
                         try:
                             emoji_id = int(emoji_id)
                             # If it's a custom emoji, force the type if it was missed
-                            if not entity_type or entity_type == "custom_emoji":
-                                entity_type = MessageEntityType.CUSTOM_EMOJI
-                        except ValueError:
-                            pass
+                            if not isinstance(entity_type, MessageEntityType) or entity_type == "custom_emoji":
+                                try:
+                                    entity_type = MessageEntityType.CUSTOM_EMOJI
+                                except AttributeError:
+                                    pass
+                        except (ValueError, TypeError):
+                            emoji_id = None
                     
-                    reconstructed_entities.append(MessageEntity(
-                        type=entity_type,
-                        offset=int(e.get("offset", 0)),
-                        length=int(e.get("length", 0)),
-                        url=e.get("url"),
-                        custom_emoji_id=emoji_id,
-                        language=e.get("language")
-                    ))
+                    # Only add if entity_type is a valid Enum member
+                    if isinstance(entity_type, MessageEntityType):
+                        reconstructed_entities.append(MessageEntity(
+                            type=entity_type,
+                            offset=int(e.get("offset", 0)),
+                            length=int(e.get("length", 0)),
+                            url=e.get("url"),
+                            custom_emoji_id=emoji_id,
+                            language=e.get("language")
+                        ))
+                    else:
+                        logger.warning(f"Skipping entity due to invalid type: {entity_type}")
                 entities = reconstructed_entities
 
             if content_type == "text":
