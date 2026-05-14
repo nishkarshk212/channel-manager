@@ -12,7 +12,9 @@ class PostService:
         file_id: Optional[str] = None,
         caption: Optional[str] = None,
         reply_markup: Optional[types.InlineKeyboardMarkup] = None,
-        entities: Optional[List[types.MessageEntity]] = None
+        entities: Optional[List[types.MessageEntity]] = None,
+        from_chat_id: Optional[int] = None,
+        message_id: Optional[int] = None
     ):
         try:
             # Ensure channel_id is an integer if it looks like one
@@ -45,6 +47,20 @@ class PostService:
                 else:
                     logger.error(f"Channel {channel_id} not found in database!")
 
+            # Use copy_message if possible to preserve premium emojis
+            if from_chat_id and message_id:
+                try:
+                    logger.info(f"Using copy_message to preserve premium emojis from {from_chat_id}:{message_id}")
+                    return await client.copy_message(
+                        chat_id=channel_id,
+                        from_chat_id=from_chat_id,
+                        message_id=message_id,
+                        caption=caption,
+                        reply_markup=reply_markup
+                    )
+                except Exception as copy_err:
+                    logger.warning(f"copy_message failed, falling back to normal send: {copy_err}")
+
             # Convert dict entities back to MessageEntity if necessary
             if entities and isinstance(entities, list) and isinstance(entities[0], dict):
                 from hydrogram.types import MessageEntity
@@ -61,18 +77,16 @@ class PostService:
                                 entity_type = MessageEntityType.CUSTOM_EMOJI
                             # Handle blockquote and other potential newer types
                             elif entity_type == "blockquote":
-                                # Try to get BLOCKQUOTE from MessageEntityType if it exists
                                 try:
                                     entity_type = MessageEntityType.BLOCKQUOTE
                                 except AttributeError:
-                                    # Fallback for older hydrogram versions
-                                    logger.warning("BLOCKQUOTE entity type not supported by this Pyrogram version")
-                                    continue # Skip if not supported
+                                    logger.warning("BLOCKQUOTE entity type not supported by this Hydrogram version")
+                                    continue
                             else:
                                 try:
                                     entity_type = getattr(MessageEntityType, entity_type.upper())
                                 except AttributeError:
-                                    logger.warning(f"Entity type {entity_type} not supported by this Pyrogram version")
+                                    logger.warning(f"Entity type {entity_type} not supported by this Hydrogram version")
                                     continue
                         except Exception as exc:
                             logger.error(f"Error mapping entity type {entity_type}: {exc}")
@@ -84,11 +98,8 @@ class PostService:
                         try:
                             emoji_id = int(emoji_id)
                             # If it's a custom emoji, force the type if it was missed
-                            if not isinstance(entity_type, MessageEntityType) or entity_type == "custom_emoji":
-                                try:
-                                    entity_type = MessageEntityType.CUSTOM_EMOJI
-                                except AttributeError:
-                                    pass
+                            if not isinstance(entity_type, MessageEntityType) or entity_type != MessageEntityType.CUSTOM_EMOJI:
+                                entity_type = MessageEntityType.CUSTOM_EMOJI
                         except (ValueError, TypeError):
                             emoji_id = None
                     
@@ -100,26 +111,33 @@ class PostService:
                             length=int(e.get("length", 0)),
                             url=e.get("url"),
                             custom_emoji_id=emoji_id,
-                            language=e.get("language")
+                            language=e.get("language"),
+                            client=client
                         ))
                     else:
                         logger.warning(f"Skipping entity due to invalid type: {entity_type}")
+                
                 entities = reconstructed_entities
+                logger.info(f"Reconstructed {len(entities)} entities for sending")
+
+            # Determine parse_mode. If we have entities, we don't need parse_mode.
+            # If we don't have entities, we'll try HTML to support cases where users send tags.
+            parse_mode = None if entities else "html"
 
             if content_type == "text":
-                return await client.send_message(channel_id, caption, reply_markup=reply_markup, entities=entities)
+                return await client.send_message(channel_id, caption, reply_markup=reply_markup, entities=entities, parse_mode=parse_mode)
             elif content_type == "photo":
-                return await client.send_photo(channel_id, file_id, caption=caption, reply_markup=reply_markup, caption_entities=entities)
+                return await client.send_photo(channel_id, file_id, caption=caption, reply_markup=reply_markup, caption_entities=entities, parse_mode=parse_mode)
             elif content_type == "video":
-                return await client.send_video(channel_id, file_id, caption=caption, reply_markup=reply_markup, caption_entities=entities)
+                return await client.send_video(channel_id, file_id, caption=caption, reply_markup=reply_markup, caption_entities=entities, parse_mode=parse_mode)
             elif content_type == "document":
-                return await client.send_document(channel_id, file_id, caption=caption, reply_markup=reply_markup, caption_entities=entities)
+                return await client.send_document(channel_id, file_id, caption=caption, reply_markup=reply_markup, caption_entities=entities, parse_mode=parse_mode)
             elif content_type == "audio":
-                return await client.send_audio(channel_id, file_id, caption=caption, reply_markup=reply_markup, caption_entities=entities)
+                return await client.send_audio(channel_id, file_id, caption=caption, reply_markup=reply_markup, caption_entities=entities, parse_mode=parse_mode)
             elif content_type == "animation":
-                return await client.send_animation(channel_id, file_id, caption=caption, reply_markup=reply_markup, caption_entities=entities)
+                return await client.send_animation(channel_id, file_id, caption=caption, reply_markup=reply_markup, caption_entities=entities, parse_mode=parse_mode)
             elif content_type == "voice":
-                return await client.send_voice(channel_id, file_id, caption=caption, reply_markup=reply_markup, caption_entities=entities)
+                return await client.send_voice(channel_id, file_id, caption=caption, reply_markup=reply_markup, caption_entities=entities, parse_mode=parse_mode)
             elif content_type == "sticker":
                 return await client.send_sticker(channel_id, file_id, reply_markup=reply_markup)
         except Exception as e:

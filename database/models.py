@@ -29,6 +29,8 @@ class Post(BaseModel):
     channel_ids: List[int]
     content_type: str  # text, photo, video, etc.
     media_file_id: Optional[str] = None
+    from_chat_id: Optional[int] = None
+    message_id: Optional[int] = None
     caption: Optional[str] = None
     entities: Optional[List[Dict[str, Any]]] = None
     buttons: List[Dict[str, str]] = []

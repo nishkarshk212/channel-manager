@@ -253,18 +253,17 @@ async def authorize_channel(client: Client, message: Message):
     try:
         chat = None
 
-        # New Telegram API
-        if message.forward_origin:
-
-            if hasattr(message.forward_origin, "chat"):
-                chat = message.forward_origin.chat
-
-            elif hasattr(message.forward_origin, "sender_chat"):
-                chat = message.forward_origin.sender_chat
-
-        # Old fallback
-        if not chat:
+        # Check for forward_from_chat (Channel/Supergroup)
+        if message.forward_from_chat:
             chat = message.forward_from_chat
+        
+        # Fallback for newer API if available (though likely not in this version)
+        elif hasattr(message, "forward_origin"):
+            origin = message.forward_origin
+            if hasattr(origin, "chat"):
+                chat = origin.chat
+            elif hasattr(origin, "sender_chat"):
+                chat = origin.sender_chat
 
         # No chat detected
         if not chat:

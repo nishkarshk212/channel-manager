@@ -2,6 +2,7 @@ from hydrogram import Client, filters, types
 from database.crud import crud
 from database.models import Post
 from utils.button_builder import ButtonBuilder
+from utils.logger import logger
 from services.post_service import post_service
 import asyncio
 from datetime import datetime
@@ -93,7 +94,10 @@ async def handle_messages(client: Client, message: types.Message):
     
     if state["step"] == "waiting_for_text":
         state["caption"] = message.text or message.caption
+        state["from_chat_id"] = message.chat.id
+        state["message_id"] = message.id
         entities = message.entities or message.caption_entities
+        logger.info(f"Captured entities for text: {entities}")
         if entities:
             state["entities"] = []
             for e in entities:
@@ -109,9 +113,10 @@ async def handle_messages(client: Client, message: types.Message):
                     "length": e.length,
                 }
                 if e.url: e_dict["url"] = e.url
-                if e.custom_emoji_id: 
-                    e_dict["custom_emoji_id"] = str(e.custom_emoji_id) # Store as string for better compatibility
+                if hasattr(e, "custom_emoji_id") and e.custom_emoji_id: 
+                    e_dict["custom_emoji_id"] = str(e.custom_emoji_id)
                     e_dict["type"] = "custom_emoji"
+                    logger.info(f"Captured custom emoji: {e.custom_emoji_id}")
                 if e.language: e_dict["language"] = e.language
                 state["entities"].append(e_dict)
         else:
@@ -120,10 +125,13 @@ async def handle_messages(client: Client, message: types.Message):
         await message.reply_text("✅ **Text saved with formatting!**", reply_markup=get_post_kb(user_id))
 
     elif state["step"] == "waiting_for_media":
+        state["from_chat_id"] = message.chat.id
+        state["message_id"] = message.id
         # Capture caption and entities from media message if present
         if message.caption:
             state["caption"] = message.caption
             entities = message.caption_entities
+            logger.info(f"Captured entities for media: {entities}")
             if entities:
                 state["entities"] = []
                 for e in entities:
@@ -138,9 +146,10 @@ async def handle_messages(client: Client, message: types.Message):
                         "length": e.length,
                     }
                     if e.url: e_dict["url"] = e.url
-                    if e.custom_emoji_id: 
+                    if hasattr(e, "custom_emoji_id") and e.custom_emoji_id: 
                         e_dict["custom_emoji_id"] = str(e.custom_emoji_id)
                         e_dict["type"] = "custom_emoji"
+                        logger.info(f"Captured custom emoji in media: {e.custom_emoji_id}")
                     if e.language: e_dict["language"] = e.language
                     state["entities"].append(e_dict)
             else:
@@ -338,7 +347,8 @@ async def preview_post(client: Client, query: types.CallbackQuery):
 
     try:
         await post_service.send_to_channel(
-            client, user_id, state["content_type"], state["file_id"], state["caption"], reply_markup, state.get("entities")
+            client, user_id, state["content_type"], state["file_id"], state["caption"], 
+            reply_markup, state.get("entities"), state.get("from_chat_id"), state.get("message_id")
         )
     except Exception as e:
         await query.message.reply_text(f"❌ Preview failed: {e}")
@@ -360,6 +370,8 @@ async def publish_now(client: Client, query: types.CallbackQuery):
             channel_ids=state["selected_channels"],
             content_type=state["content_type"],
             media_file_id=state["file_id"],
+            from_chat_id=state.get("from_chat_id"),
+            message_id=state.get("message_id"),
             caption=state["caption"],
             entities=state.get("entities"),
             buttons=state["buttons"],
@@ -389,7 +401,8 @@ async def publish_now(client: Client, query: types.CallbackQuery):
     for ch_id in state["selected_channels"]:
         try:
             await post_service.send_to_channel(
-                client, ch_id, state["content_type"], state["file_id"], state["caption"], reply_markup, state.get("entities")
+                client, ch_id, state["content_type"], state["file_id"], state["caption"], 
+                reply_markup, state.get("entities"), state.get("from_chat_id"), state.get("message_id")
             )
             success_count += 1
         except Exception as e:
@@ -401,6 +414,8 @@ async def publish_now(client: Client, query: types.CallbackQuery):
         channel_ids=state["selected_channels"],
         content_type=state["content_type"],
         media_file_id=state["file_id"],
+        from_chat_id=state.get("from_chat_id"),
+        message_id=state.get("message_id"),
         caption=state["caption"],
         entities=state.get("entities"),
         buttons=state["buttons"],
