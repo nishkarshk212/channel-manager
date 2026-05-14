@@ -96,6 +96,7 @@ async def handle_messages(client: Client, message: types.Message):
         state["caption"] = message.text or message.caption
         state["from_chat_id"] = message.chat.id
         state["message_id"] = message.id
+        state["entities_match_msg"] = True
         entities = message.entities or message.caption_entities
         logger.info(f"Captured entities for text: {entities}")
         if entities:
@@ -130,6 +131,7 @@ async def handle_messages(client: Client, message: types.Message):
         # Capture caption and entities from media message if present
         if message.caption:
             state["caption"] = message.caption
+            state["entities_match_msg"] = True
             entities = message.caption_entities
             logger.info(f"Captured entities for media: {entities}")
             if entities:
@@ -154,6 +156,8 @@ async def handle_messages(client: Client, message: types.Message):
                     state["entities"].append(e_dict)
             else:
                 state["entities"] = None
+        else:
+            state["entities_match_msg"] = False
 
         if message.photo:
             state["content_type"] = "photo"
@@ -202,11 +206,28 @@ async def handle_messages(client: Client, message: types.Message):
         
         try:
             added_count = 0
+            color_map = {
+                "::blue": "🔵",
+                "::green": "🟢",
+                "::red": "🔴",
+                "::yellow": "🟡",
+                "::orange": "🟠",
+                "::purple": "🟣",
+                "::white": "⚪",
+                "::black": "⚫"
+            }
+            
             for line in message.text.split("\n"):
                 if "|" not in line: continue
                 text, url = line.split("|", 1)
                 text = text.strip()
                 url = url.strip()
+                
+                # Handle multicolour buttons
+                for suffix, emoji in color_map.items():
+                    if text.endswith(suffix):
+                        text = f"{emoji} {text.replace(suffix, '').strip()}"
+                        break
                 
                 # Basic URL cleanup and validation
                 if not url.startswith(("http://", "https://")):
@@ -348,7 +369,8 @@ async def preview_post(client: Client, query: types.CallbackQuery):
     try:
         await post_service.send_to_channel(
             client, user_id, state["content_type"], state["file_id"], state["caption"], 
-            reply_markup, state.get("entities"), state.get("from_chat_id"), state.get("message_id")
+            reply_markup, state.get("entities"), state.get("from_chat_id"), state.get("message_id"),
+            state.get("entities_match_msg", False)
         )
     except Exception as e:
         await query.message.reply_text(f"❌ Preview failed: {e}")
@@ -372,6 +394,7 @@ async def publish_now(client: Client, query: types.CallbackQuery):
             media_file_id=state["file_id"],
             from_chat_id=state.get("from_chat_id"),
             message_id=state.get("message_id"),
+            entities_match_msg=state.get("entities_match_msg", False),
             caption=state["caption"],
             entities=state.get("entities"),
             buttons=state["buttons"],
@@ -402,7 +425,8 @@ async def publish_now(client: Client, query: types.CallbackQuery):
         try:
             await post_service.send_to_channel(
                 client, ch_id, state["content_type"], state["file_id"], state["caption"], 
-                reply_markup, state.get("entities"), state.get("from_chat_id"), state.get("message_id")
+                reply_markup, state.get("entities"), state.get("from_chat_id"), state.get("message_id"),
+                state.get("entities_match_msg", False)
             )
             success_count += 1
         except Exception as e:
@@ -416,6 +440,7 @@ async def publish_now(client: Client, query: types.CallbackQuery):
         media_file_id=state["file_id"],
         from_chat_id=state.get("from_chat_id"),
         message_id=state.get("message_id"),
+        entities_match_msg=state.get("entities_match_msg", False),
         caption=state["caption"],
         entities=state.get("entities"),
         buttons=state["buttons"],

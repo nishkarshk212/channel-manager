@@ -31,7 +31,8 @@ class Scheduler:
                         reply_markup=reply_markup,
                         entities=post.get("entities"),
                         from_chat_id=post.get("from_chat_id"),
-                        message_id=post.get("message_id")
+                        message_id=post.get("message_id"),
+                        entities_match_msg=post.get("entities_match_msg", False)
                     )
                 await crud.update_post_status(str(post["_id"]), "published")
                 logger.info(f"Scheduled post {post['_id']} published")

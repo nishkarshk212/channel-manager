@@ -31,6 +31,7 @@ class Post(BaseModel):
     media_file_id: Optional[str] = None
     from_chat_id: Optional[int] = None
     message_id: Optional[int] = None
+    entities_match_msg: bool = False
     caption: Optional[str] = None
     entities: Optional[List[Dict[str, Any]]] = None
     buttons: List[Dict[str, str]] = []

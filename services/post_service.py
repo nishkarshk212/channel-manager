@@ -14,7 +14,8 @@ class PostService:
         reply_markup: Optional[types.InlineKeyboardMarkup] = None,
         entities: Optional[List[types.MessageEntity]] = None,
         from_chat_id: Optional[int] = None,
-        message_id: Optional[int] = None
+        message_id: Optional[int] = None,
+        entities_match_msg: bool = False
     ):
         try:
             # Ensure channel_id is an integer if it looks like one
@@ -50,14 +51,26 @@ class PostService:
             # Use copy_message if possible to preserve premium emojis
             if from_chat_id and message_id:
                 try:
-                    logger.info(f"Using copy_message to preserve premium emojis from {from_chat_id}:{message_id}")
-                    return await client.copy_message(
-                        chat_id=channel_id,
-                        from_chat_id=from_chat_id,
-                        message_id=message_id,
-                        caption=caption,
-                        reply_markup=reply_markup
-                    )
+                    # If entities match the original message, we can copy without overriding caption
+                    # to preserve premium emojis even for non-premium bots.
+                    if entities_match_msg:
+                        logger.info(f"Using copy_message (no override) to preserve premium emojis from {from_chat_id}:{message_id}")
+                        return await client.copy_message(
+                            chat_id=channel_id,
+                            from_chat_id=from_chat_id,
+                            message_id=message_id,
+                            reply_markup=reply_markup
+                        )
+                    else:
+                        logger.info(f"Using copy_message (with override) from {from_chat_id}:{message_id}")
+                        return await client.copy_message(
+                            chat_id=channel_id,
+                            from_chat_id=from_chat_id,
+                            message_id=message_id,
+                            caption=caption,
+                            caption_entities=entities,
+                            reply_markup=reply_markup
+                        )
                 except Exception as copy_err:
                     logger.warning(f"copy_message failed, falling back to normal send: {copy_err}")
 
