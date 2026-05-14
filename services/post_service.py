@@ -55,12 +55,19 @@ class PostService:
                     # to preserve premium emojis even for non-premium bots.
                     if entities_match_msg:
                         logger.info(f"Using copy_message (no override) to preserve premium emojis from {from_chat_id}:{message_id}")
-                        return await client.copy_message(
+                        # Send without reply_markup first to avoid stripping premium emojis
+                        msg = await client.copy_message(
                             chat_id=channel_id,
                             from_chat_id=from_chat_id,
-                            message_id=message_id,
-                            reply_markup=reply_markup
+                            message_id=message_id
                         )
+                        # Then add reply_markup if needed
+                        if reply_markup:
+                            try:
+                                await msg.edit_reply_markup(reply_markup)
+                            except Exception as e:
+                                logger.warning(f"Failed to edit reply_markup after copy: {e}")
+                        return msg
                     else:
                         logger.info(f"Using copy_message (with override) from {from_chat_id}:{message_id}")
                         return await client.copy_message(

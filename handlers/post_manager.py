@@ -97,6 +97,16 @@ async def handle_messages(client: Client, message: types.Message):
         state["from_chat_id"] = message.chat.id
         state["message_id"] = message.id
         state["entities_match_msg"] = True
+        
+        # Capture buttons if present in the message
+        if message.reply_markup and hasattr(message.reply_markup, "inline_keyboard"):
+            state["buttons"] = []
+            for row in message.reply_markup.inline_keyboard:
+                for btn in row:
+                    if btn.url:
+                        state["buttons"].append({"text": btn.text, "url": btn.url})
+            logger.info(f"Captured {len(state['buttons'])} buttons from message")
+
         entities = message.entities or message.caption_entities
         logger.info(f"Captured entities for text: {entities}")
         if entities:
@@ -128,6 +138,16 @@ async def handle_messages(client: Client, message: types.Message):
     elif state["step"] == "waiting_for_media":
         state["from_chat_id"] = message.chat.id
         state["message_id"] = message.id
+        
+        # Capture buttons if present in the media message
+        if message.reply_markup and hasattr(message.reply_markup, "inline_keyboard"):
+            state["buttons"] = []
+            for row in message.reply_markup.inline_keyboard:
+                for btn in row:
+                    if btn.url:
+                        state["buttons"].append({"text": btn.text, "url": btn.url})
+            logger.info(f"Captured {len(state['buttons'])} buttons from media message")
+
         # Capture caption and entities from media message if present
         if message.caption:
             state["caption"] = message.caption
@@ -207,14 +227,15 @@ async def handle_messages(client: Client, message: types.Message):
         try:
             added_count = 0
             color_map = {
-                "::blue": "🔵",
-                "::green": "🟢",
-                "::red": "🔴",
-                "::yellow": "🟡",
-                "::orange": "🟠",
-                "::purple": "🟣",
-                "::white": "⚪",
-                "::black": "⚫"
+                "::blue": "🟦",
+                "::green": "🟩",
+                "::red": "🟥",
+                "::yellow": "🟨",
+                "::orange": "🟧",
+                "::purple": "🟪",
+                "::white": "⬜",
+                "::black": "⬛",
+                "::brown": "🟫"
             }
             
             for line in message.text.split("\n"):
