@@ -299,29 +299,11 @@ async def handle_messages(client: Client, message: types.Message):
         
         try:
             added_count = 0
-            color_map = {
-                "::blue": "🟦",
-                "::green": "🟩",
-                "::red": "🟥",
-                "::yellow": "🟨",
-                "::orange": "🟧",
-                "::purple": "🟪",
-                "::white": "⬜",
-                "::black": "⬛",
-                "::brown": "🟫"
-            }
-            
             for line in message.text.split("\n"):
                 if "|" not in line: continue
                 text, url = line.split("|", 1)
                 text = text.strip()
                 url = url.strip()
-                
-                # Handle multicolour buttons
-                for suffix, emoji in color_map.items():
-                    if suffix in text:
-                        text = f"{emoji} {text.replace(suffix, '').strip()}"
-                        break
                 
                 # Basic URL cleanup and validation
                 if not url.startswith(("http://", "https://")):
