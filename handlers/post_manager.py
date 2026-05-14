@@ -22,9 +22,82 @@ def get_post_kb(user_id):
         selected_count=len(state.get("selected_channels", []))
     )
 
-@Client.on_message(filters.command("broadcast") & filters.private)
+@Client.on_message(filters.command(["broadcast", "settext"]) & filters.private)
 async def broadcast_command_handler(client: Client, message: types.Message):
-    user_states[message.from_user.id] = {
+    user_id = message.from_user.id
+    
+    # Handle /settext command
+    if message.text.startswith("/settext"):
+        if user_id not in user_states:
+             user_states[user_id] = {
+                "step": "idle",
+                "content_type": "text",
+                "file_id": None,
+                "caption": None,
+                "buttons": [],
+                "schedule_time": None,
+                "selected_channels": []
+            }
+        
+        state = user_states[user_id]
+        
+        # Check if there's a reply to get premium emojis
+        if message.reply_to_message:
+            target = message.reply_to_message
+            state["caption"] = target.text or target.caption
+            state["from_chat_id"] = target.chat.id
+            state["message_id"] = target.id
+            state["entities_match_msg"] = True
+            
+            # Capture buttons from the replied message too
+            if target.reply_markup and hasattr(target.reply_markup, "inline_keyboard"):
+                state["buttons"] = []
+                for row in target.reply_markup.inline_keyboard:
+                    for btn in row:
+                        if btn.url:
+                            state["buttons"].append({"text": btn.text, "url": btn.url})
+                logger.info(f"Captured {len(state['buttons'])} buttons from replied message")
+            
+            # Capture entities for fallback
+            entities = target.entities or target.caption_entities
+            if entities:
+                state["entities"] = []
+                for e in entities:
+                    try:
+                        entity_type = e.type.name.lower() if hasattr(e.type, "name") else str(e.type).split(".")[-1].lower()
+                    except Exception:
+                        entity_type = str(e.type)
+                    
+                    e_dict = {
+                        "type": entity_type,
+                        "offset": e.offset,
+                        "length": e.length,
+                    }
+                    if e.url: e_dict["url"] = e.url
+                    if hasattr(e, "custom_emoji_id") and e.custom_emoji_id: 
+                        e_dict["custom_emoji_id"] = str(e.custom_emoji_id)
+                        e_dict["type"] = "custom_emoji"
+                    if e.language: e_dict["language"] = e.language
+                    state["entities"].append(e_dict)
+            else:
+                state["entities"] = None
+
+            return await message.reply_text("✅ **Text and Premium emojis captured from reply!**", reply_markup=get_post_kb(user_id))
+        
+        # If no reply, use the text after command
+        cmd_text = message.text.replace("/settext", "").strip()
+        if cmd_text:
+            state["caption"] = cmd_text
+            state["from_chat_id"] = message.chat.id
+            state["message_id"] = message.id
+            state["entities_match_msg"] = True # It's a direct message so it's the original
+            state["entities"] = None # Will rely on copy_message
+            return await message.reply_text("✅ **Text saved!**", reply_markup=get_post_kb(user_id))
+        else:
+            return await message.reply_text("❌ Please use `/settext your text` or reply to a message with `/settext`.")
+
+    # Normal /broadcast logic
+    user_states[user_id] = {
         "step": "idle",
         "content_type": "text",
         "file_id": None,
@@ -246,7 +319,7 @@ async def handle_messages(client: Client, message: types.Message):
                 
                 # Handle multicolour buttons
                 for suffix, emoji in color_map.items():
-                    if text.endswith(suffix):
+                    if suffix in text:
                         text = f"{emoji} {text.replace(suffix, '').strip()}"
                         break
                 
